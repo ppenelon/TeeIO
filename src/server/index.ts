@@ -10,6 +10,7 @@ const http = createServer(app);
 const io = socketio(http);
 
 app.use(express.static(path.resolve('public')));
+app.use('/assets', express.static(path.resolve('assets')));
 
 app.get('/*', (req, res) => {
     res.sendFile(path.resolve('public/index.html'));
