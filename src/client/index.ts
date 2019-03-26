@@ -1,5 +1,5 @@
 import * as socketio from 'socket.io-client';
-import Game from './game';
+import Game from './Game';
 
 let socket = socketio();
 
