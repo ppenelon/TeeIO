@@ -19,7 +19,7 @@ export default class Game{
     world: P2.World;
     player: P2.Body;
 
-    hook: {distance: number, position: [number, number], speed: number, max: number, hasHit: boolean, hit: [number, number]};
+    hook: Hook;
 
     constructor(){
         let that = this;
@@ -63,14 +63,7 @@ export default class Game{
             this.map = map;
         });
         // Other
-        this.hook = {
-            distance: 0,
-            position: [0, 0],
-            speed: 2000,
-            max: 175,
-            hasHit: false,
-            hit: [0, 0]
-        }
+        this.hook = new Hook(1750, 175);
     }
 
     private preload(this: Phaser.Scene, game: Game){
@@ -89,65 +82,100 @@ export default class Game{
             game.text = null;
         }
         if(game.text) return;
-        // Logic
+        /**
+         * LOGIC
+         */
         let mouse = getMouseClicks(this.input.activePointer.buttons);
-        let point: [number, number] = [0, 0];
         if(mouse.right.up){
-            if(!game.hook.hasHit || game.hook.distance === game.hook.max){
-                // Nouvelle distance du grapin
-                game.hook.distance += game.hook.speed * (delta / 1000);
-                game.hook.distance = Math.min(game.hook.distance, game.hook.max);
-                // Calcul de la nouvelle position du grappin
-                let raycastEnd = this.game.input.mousePointer.position.clone();
-                raycastEnd.subtract(new Vector2(game.player.position[0], game.player.position[1]));
-                raycastEnd.normalize();
-                raycastEnd.multiply(new Vector2(game.hook.distance, game.hook.distance));
-                raycastEnd.add(new Vector2(game.player.position[0], game.player.position[1]));
-                game.hook.position = [raycastEnd.x, raycastEnd.y];
-                // Calcul du nouveau Raycast
+            if(!game.hook.fired || (game.hook.fired && !game.hook.recalled && !game.hook.hit)){
+                // Si c'est un nouveau tir, on déclenche le grappin
+                if(!game.hook.fired){
+                    // Calcul de la nouvelle direction du grappin
+                    game.hook.direction.setFromObject(
+                        this.game.input.mousePointer.position.clone()
+                        .subtract(new Vector2(game.player.position[0], game.player.position[1]))
+                        .normalize()
+                    );
+                    // Déclenchement du grappin
+                    game.hook.fired = true;
+                    // On lui attribue la position du joueur
+                    game.hook.position.setFromObject(new Vector2(game.player.position[0], game.player.position[1]));
+                }
+                // On sauvegarde son ancienne position pour savoir si le mouvement a touché quelque chose
+                let oldPosition = game.hook.position.clone();
+                // Mise à jour de la position du grappin
+                game.hook.position = game.hook.position.add(
+                    game.hook.direction.clone()
+                    .multiply(
+                        new Vector2(game.hook.speed, game.hook.speed)
+                        .multiply(new Vector2(delta / 1000))
+                    )
+                );
+                // Création du nouveau Raycast
                 let hookRay = new P2.Ray({
                     mode: P2.Ray.CLOSEST,
-                    from: game.player.position,
-                    to: game.hook.position,
+                    from: [oldPosition.x, oldPosition.y],
+                    to: [game.hook.position.x, game.hook.position.y],
                     collisionMask: COLLISIONS.WALL
                 });
-                // Récupération du résultat
+                // Résultat du Raycast
                 let rayResult = new P2.RaycastResult();
                 let hasHit = game.world.raycast(rayResult, hookRay);
+                // Si ça a touché quelque chose
                 if(hasHit){
-                    game.hook.hasHit = true;
-                    rayResult.getHitPoint(game.hook.hit, hookRay);
+                    let point: [number, number] = [0, 0];
+                    rayResult.getHitPoint(point, hookRay);
+                    game.hook.hit = new Vector2(point[0], point[1]);
+                }
+                else{ // Si ça n'a pas touché on regarde si le grappin n'est pas allé trop loin
+                    let distancePlayerHook = new Vector2(game.player.position[0], game.player.position[1]).distance(game.hook.position);
+                    if(distancePlayerHook >= game.hook.maxDistance){
+                        // On rappelle le grappin
+                        game.hook.recalled = true;
+                    }
                 }
             }
-            if(game.hook.hasHit){
-                let direction = new Vector2(game.hook.hit[0], game.hook.hit[1]).subtract(new Vector2(game.player.position[0], game.player.position[1])).normalize();
+            // Si on a touché quelque chose
+            if(game.hook.hit){
+                let direction = new Vector2(game.hook.hit.x, game.hook.hit.y).subtract(new Vector2(game.player.position[0], game.player.position[1])).normalize();
                 let force = 35;
                 let move = direction.multiply(new Vector2(force, force));
                 game.player.applyImpulse([move.x, move.y]);
             }
         }
         else if(mouse.right.released){
-            game.hook.hasHit = false;
-            game.hook.distance = 0;
+            game.hook.reset();
         }
-        // Update
+
+        /**
+         * PHYSICS
+         */
         game.world.step(1 / 60, delta, 10);
-        // Draw map
-        this.cameras.main.setBackgroundColor(0xE7E7E7);
+
+        /**
+         * DRAW
+         */
         game.graphics.clear();
+        this.cameras.main.setBackgroundColor(0xE7E7E7);
+        // Hook
+        if(game.hook.hit){
+            game.graphics.fillStyle(0x00FFFF);
+            game.graphics.fillCircle(game.hook.hit.x, game.hook.hit.y, 5);
+        }
+        if(game.hook.fired && !game.hook.recalled){
+            game.graphics.lineStyle(2, 0x000000);
+            game.graphics.lineBetween(
+                game.player.position[0],
+                game.player.position[1],
+                (game.hook.hit && game.hook.hit.x) || game.hook.position.x,
+                (game.hook.hit && game.hook.hit.y) || game.hook.position.y
+            );
+        }
+        // Map & Player
         game.world.bodies.forEach(b => {
             game.graphics.fillStyle(b.type === P2.Body.STATIC ? 0x7E7E7E : 0xFF0000);
             game.graphics.fillCircle(b.position[0], b.position[1], (b.shapes[0] as P2.Circle).radius);
         });
-        // Hook
-        if(game.hook.hasHit){
-            game.graphics.fillStyle(0x00FFFF);
-            game.graphics.fillCircle(game.hook.hit[0], game.hook.hit[1], 5);
-        }
-        if(game.hook.distance > 0){
-            game.graphics.lineStyle(2, 0x000000);
-            game.graphics.lineBetween(game.player.position[0], game.player.position[1], game.hook.position[0], game.hook.position[1]);
-        }
     }
 }
 
@@ -168,4 +196,35 @@ function getMouseClicks(buttons: number){
         }
     };
     return oldState;
+}
+
+class Hook {
+
+    maxDistance: number;
+    speed: number;
+
+    position: Vector2;
+    direction: Vector2;
+    hit: Vector2;
+
+    fired: boolean;
+    recalled: boolean;
+
+    constructor(speed: number, maxDistance: number){
+        this.maxDistance = maxDistance;
+        this.speed = speed;
+        this.position = new Vector2();
+        this.direction = new Vector2();
+        this.hit = null;
+        this.fired = false;
+        this.recalled = false;
+    }
+
+    reset(){
+        this.hit = null;
+        this.direction.set(0);
+        this.position.set(0);
+        this.fired = false;
+        this.recalled = false;
+    }
 }
