@@ -11,7 +11,9 @@ const COLLISIONS = {
 
 const CONSTANTS = {
     MOVE_SPEED_ACCELERATION: 250,
-    HOOK_FORCE: 35
+    HOOK_FORCE: 35,
+    BOMB: [[0, 0], [1, 0], [0.9, 0.3], [0.8, 0.6], [0.6, 0.8], [0.3, 0.9], [0, 1]] as [number, number][],
+    CURVE: [[0, 0], [1, 0], [0.7, 0.1], [0.4, 0.2], [0.2, 0.4], [0.1, 0.7], [0, 1]] as [number, number][]
 }
 
 type Key = Phaser.Input.Keyboard.Key;
@@ -58,30 +60,78 @@ export default class Game{
         this.player.addShape(circleShape);
         this.world.addBody(this.player);
         // Map
+        let wallShapeCollision = { collisionGroup: COLLISIONS.WALL, collisionMask: COLLISIONS.PLAYER };
         Map.fromWeb('map1')
         .then(map => {
-            let tile = new Vector2(this.game.canvas.width / map.size.x, this.game.canvas.height / map.size.y);
+            let tileSize = new Vector2(this.game.canvas.width / map.size.x, this.game.canvas.height / map.size.y);
             map.data.forEach((d, i) => {
+                let tilePosition = new Vector2(
+                    (i % map.size.x) * tileSize.x + (tileSize.x / 2),
+                    Math.floor(i / map.size.x) * tileSize.y + (tileSize.y / 2)
+                );
                 let shape: P2.Shape;
-                let x: number, y: number;
-                let wallShapeCollision = { collisionGroup: COLLISIONS.WALL, collisionMask: COLLISIONS.PLAYER };
+                let vertices: [number, number][] = null;
                 switch(d){
-                    case 1: // CIRCLE
-                        x = (i % map.size.x) * tile.x + (tile.x / 2);
-                        y = Math.floor(i / map.size.x) * tile.y + (tile.y / 2);
-                        shape = new P2.Circle({ radius: tile.x / 2, ...wallShapeCollision });
+                    case 1: // BOX
+                        shape = new P2.Box({ width: tileSize.x, height: tileSize.y, ...wallShapeCollision });
                         break;
-                    case 2: // SQUARE
-                        x = (i % map.size.x) * tile.x + (tile.x / 2);
-                        y = Math.floor(i / map.size.x) * tile.y + (tile.y / 2);
-                        shape = new P2.Box({ width: tile.x, height: tile.y, ...wallShapeCollision });
+                    case 2: // BOMB - TOP - RIGHT
+                        vertices = CONSTANTS.BOMB.map(v => [v[0], -v[1]]) as [number, number][];
+                        tilePosition.x -= tileSize.x / 2;
+                        tilePosition.y += tileSize.y / 2;
+                        break;
+                    case 3: // BOMB - BOTTOM - RIGHT
+                        vertices = CONSTANTS.BOMB.map(v => [v[0], v[1]]) as [number, number][];
+                        tilePosition.x -= tileSize.x / 2;
+                        tilePosition.y -= tileSize.y / 2;
+                        break;
+                    case 4: // BOMB - BOTTOM - LEFT
+                        vertices = CONSTANTS.BOMB.map(v => [-v[0], v[1]]) as [number, number][];
+                        tilePosition.x += tileSize.x / 2;
+                        tilePosition.y -= tileSize.y / 2;
+                        break;
+                    case 5: // BOMB - TOP - LEFT
+                        vertices = CONSTANTS.BOMB.map(v => [-v[0], -v[1]]) as [number, number][];
+                        tilePosition.x += tileSize.x / 2;
+                        tilePosition.y += tileSize.y / 2;
+                        break;
+                    case 6: // CURVE - TOP - RIGHT
+                        vertices = CONSTANTS.CURVE.map(v => [v[0], -v[1]]) as [number, number][];
+                        tilePosition.x -= tileSize.x / 2;
+                        tilePosition.y += tileSize.y / 2;
+                        break;
+                    case 7: // CURVE - BOTTOM - RIGHT
+                        vertices = CONSTANTS.CURVE.map(v => [v[0], v[1]]) as [number, number][];
+                        tilePosition.x -= tileSize.x / 2;
+                        tilePosition.y -= tileSize.y / 2;
+                        break;
+                    case 8: // CURVE - BOTTOM - LEFT
+                        vertices = CONSTANTS.CURVE.map(v => [-v[0], v[1]]) as [number, number][];
+                        tilePosition.x += tileSize.x / 2;
+                        tilePosition.y -= tileSize.y / 2;
+                        break;
+                    case 9: // CURVE - TOP - LEFT
+                        vertices = CONSTANTS.CURVE.map(v => [-v[0], -v[1]]) as [number, number][];
+                        tilePosition.x += tileSize.x / 2;
+                        tilePosition.y += tileSize.y / 2;
                         break;
                     default: // EMPTY
                         return;
                 }
-                shape.material = wallMaterial;
-                let body = new P2.Body({ position: [x, y] });
-                body.addShape(shape);
+                let body = new P2.Body({ position: [tilePosition.x, tilePosition.y] });
+                if(vertices){
+                    vertices = vertices.map(v => [v[0] * tileSize.x, v[1] * tileSize.y]) as [number, number][];
+                    body.fromPolygon(vertices);
+                    body.shapes.map(s => {
+                        s.material = wallMaterial;
+                        s.collisionGroup = COLLISIONS.WALL;
+                        s.collisionMask = COLLISIONS.PLAYER;
+                    });
+                }
+                else if(shape){
+                    shape.material = wallMaterial;
+                    body.addShape(shape);
+                }
                 this.world.addBody(body);
             });
             this.map = map;
@@ -214,21 +264,22 @@ export default class Game{
         // Draw physic bodies
         game.world.bodies.forEach(b => {
             b.shapes.forEach(s => {
-                // Couleur en fonction du type
-                if(s.collisionGroup === COLLISIONS.WALL){
-                    game.graphics.fillStyle(0x7E7E7E);
-                }
-                else if(s.collisionGroup === COLLISIONS.PLAYER){
-                    game.graphics.fillStyle(0xFF0000);
-                }
+                // On met à jour la couleur de la forme en fonction de son groupe
+                updateFillColor(s, game.graphics);
                 // Dessin de la forme
-                if(b.shapes[0] instanceof P2.Circle){
-                    let circle = b.shapes[0] as P2.Circle;
-                    game.graphics.fillCircle(b.position[0], b.position[1], circle.radius);
+                if(s instanceof P2.Box){
+                    game.graphics.fillRect(b.position[0] - (s.width / 2), b.position[1] - (s.height / 2), s.width, s.height);
                 }
-                else if(b.shapes[0] instanceof P2.Box){
-                    let box = b.shapes[0] as P2.Box;
-                    game.graphics.fillRect(b.position[0] - (box.width / 2), b.position[1] - (box.height / 2), box.width, box.height);
+                else if(s instanceof P2.Convex){
+                    game.graphics.beginPath();
+                    s.vertices.forEach((v, i) => {
+                        if(i === 0)
+                            game.graphics.moveTo(b.position[0] + s.position[0] + v[0], b.position[1] + s.position[1] + v[1]);
+                        else
+                            game.graphics.lineTo(b.position[0] + s.position[0] + v[0], b.position[1] + s.position[1] + v[1]);
+                    });
+                    game.graphics.closePath();
+                    game.graphics.fillPath();
                 }
             });
         });
@@ -252,6 +303,15 @@ function getMouseClicks(buttons: number){
         }
     };
     return oldState;
+}
+
+function updateFillColor(shape: P2.Shape, graphics: Phaser.GameObjects.Graphics){
+    if(shape.collisionGroup === COLLISIONS.WALL){
+        graphics.fillStyle(0x7E7E7E);
+    }
+    else if(shape.collisionGroup === COLLISIONS.PLAYER){
+        graphics.fillStyle(0xFF0000);
+    }
 }
 
 class Hook {
