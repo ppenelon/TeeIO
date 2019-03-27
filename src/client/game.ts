@@ -39,9 +39,10 @@ export default class Game{
         let wallMaterial = new P2.Material();
         let playerMaterial = new P2.Material();
         this.world.addContactMaterial(new P2.ContactMaterial(playerMaterial, wallMaterial, {
-            restitution: .1
+            restitution: 0.1,
+            friction: 0.8
         }));
-        this.player = new P2.Body({ mass: 5, position: [155, 150] });
+        this.player = new P2.Body({ mass: 5, position: [155, 150], fixedRotation: true });
         let circleShape = new P2.Circle({ radius: 15, collisionGroup: COLLISIONS.PLAYER, collisionMask: COLLISIONS.WALL });
         circleShape.material = playerMaterial;
         this.player.addShape(circleShape);
