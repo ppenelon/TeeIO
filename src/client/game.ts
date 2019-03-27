@@ -4,6 +4,11 @@ import * as P2 from 'p2';
 import Vector2 from '../shared/Vector2';
 import Map from './Map';
 
+const COLLISIONS = {
+    WALL: 1 << 0,
+    PLAYER: 1 << 1
+}
+
 export default class Game{
 
     game: Phaser.Game;
@@ -13,6 +18,8 @@ export default class Game{
 
     world: P2.World;
     player: P2.Body;
+
+    hook: {distance: number, position: [number, number], speed: number, max: number, hasHit: boolean, hit: [number, number]};
 
     constructor(){
         let that = this;
@@ -35,7 +42,7 @@ export default class Game{
             restitution: .1
         }));
         this.player = new P2.Body({ mass: 5, position: [155, 150] });
-        let circleShape = new P2.Circle({ radius: 15 });
+        let circleShape = new P2.Circle({ radius: 15, collisionGroup: COLLISIONS.PLAYER, collisionMask: COLLISIONS.WALL });
         circleShape.material = playerMaterial;
         this.player.addShape(circleShape);
         this.world.addBody(this.player);
@@ -48,13 +55,22 @@ export default class Game{
                 let x = (i % map.size.x) * (radius * 2) + radius;
                 let y = Math.floor(i / map.size.x) * (radius * 2) + radius;
                 let circleBody = new P2.Body({ position: [x, y] });
-                let circleShape = new P2.Circle({ radius });
+                let circleShape = new P2.Circle({ radius, collisionGroup: COLLISIONS.WALL, collisionMask: COLLISIONS.PLAYER });
                 circleShape.material = wallMaterial;
                 circleBody.addShape(circleShape);
                 this.world.addBody(circleBody);
             });
             this.map = map;
         });
+        // Other
+        this.hook = {
+            distance: 0,
+            position: [0, 0],
+            speed: 2000,
+            max: 175,
+            hasHit: false,
+            hit: [0, 0]
+        }
     }
 
     private preload(this: Phaser.Scene, game: Game){
@@ -75,14 +91,44 @@ export default class Game{
         if(game.text) return;
         // Logic
         let mouse = getMouseClicks(this.input.activePointer.buttons);
+        let point: [number, number] = [0, 0];
         if(mouse.right.up){
-            let direction = this.input.mousePointer.position.clone().subtract(new Vector2(game.player.position[0], game.player.position[1])).normalize();
-            let force = 50;
-            let move = direction.multiply(new Vector2(force, force));
-            game.player.applyImpulse([move.x, move.y]);
-            // let player = game.world.bodies.filter(b => b.type !== P2.Body.STATIC)[0];
-            // player.position = [this.input.mousePointer.x, this.input.mousePointer.y];
-            // player.velocity = [0, 0];
+            if(!game.hook.hasHit || game.hook.distance === game.hook.max){
+                // Nouvelle distance du grapin
+                game.hook.distance += game.hook.speed * (delta / 1000);
+                game.hook.distance = Math.min(game.hook.distance, game.hook.max);
+                // Calcul de la nouvelle position du grappin
+                let raycastEnd = this.game.input.mousePointer.position.clone();
+                raycastEnd.subtract(new Vector2(game.player.position[0], game.player.position[1]));
+                raycastEnd.normalize();
+                raycastEnd.multiply(new Vector2(game.hook.distance, game.hook.distance));
+                raycastEnd.add(new Vector2(game.player.position[0], game.player.position[1]));
+                game.hook.position = [raycastEnd.x, raycastEnd.y];
+                // Calcul du nouveau Raycast
+                let hookRay = new P2.Ray({
+                    mode: P2.Ray.CLOSEST,
+                    from: game.player.position,
+                    to: game.hook.position,
+                    collisionMask: COLLISIONS.WALL
+                });
+                // Récupération du résultat
+                let rayResult = new P2.RaycastResult();
+                let hasHit = game.world.raycast(rayResult, hookRay);
+                if(hasHit){
+                    game.hook.hasHit = true;
+                    rayResult.getHitPoint(game.hook.hit, hookRay);
+                }
+            }
+            if(game.hook.hasHit){
+                let direction = new Vector2(game.hook.hit[0], game.hook.hit[1]).subtract(new Vector2(game.player.position[0], game.player.position[1])).normalize();
+                let force = 35;
+                let move = direction.multiply(new Vector2(force, force));
+                game.player.applyImpulse([move.x, move.y]);
+            }
+        }
+        else if(mouse.right.released){
+            game.hook.hasHit = false;
+            game.hook.distance = 0;
         }
         // Update
         game.world.step(1 / 60, delta, 10);
@@ -93,6 +139,15 @@ export default class Game{
             game.graphics.fillStyle(b.type === P2.Body.STATIC ? 0x7E7E7E : 0xFF0000);
             game.graphics.fillCircle(b.position[0], b.position[1], (b.shapes[0] as P2.Circle).radius);
         });
+        // Hook
+        if(game.hook.hasHit){
+            game.graphics.fillStyle(0x00FFFF);
+            game.graphics.fillCircle(game.hook.hit[0], game.hook.hit[1], 5);
+        }
+        if(game.hook.distance > 0){
+            game.graphics.lineStyle(2, 0x000000);
+            game.graphics.lineBetween(game.player.position[0], game.player.position[1], game.hook.position[0], game.hook.position[1]);
+        }
     }
 }
 
