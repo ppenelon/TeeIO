@@ -49,16 +49,29 @@ export default class Game{
         // Map creation
         Map.fromWeb('map1')
         .then(map => {
-            let radius = (this.game.canvas.width / map.size.x) / 2;
+            let tile = new Vector2(this.game.canvas.width / map.size.x, this.game.canvas.height / map.size.y);
             map.data.forEach((d, i) => {
-                if(d !== 1) return;
-                let x = (i % map.size.x) * (radius * 2) + radius;
-                let y = Math.floor(i / map.size.x) * (radius * 2) + radius;
-                let circleBody = new P2.Body({ position: [x, y] });
-                let circleShape = new P2.Circle({ radius, collisionGroup: COLLISIONS.WALL, collisionMask: COLLISIONS.PLAYER });
-                circleShape.material = wallMaterial;
-                circleBody.addShape(circleShape);
-                this.world.addBody(circleBody);
+                let shape: P2.Shape;
+                let x: number, y: number;
+                let wallShapeCollision = { collisionGroup: COLLISIONS.WALL, collisionMask: COLLISIONS.PLAYER };
+                switch(d){
+                    case 1: // CIRCLE
+                        x = (i % map.size.x) * tile.x + (tile.x / 2);
+                        y = Math.floor(i / map.size.x) * tile.y + (tile.y / 2);
+                        shape = new P2.Circle({ radius: tile.x / 2, ...wallShapeCollision });
+                        break;
+                    case 2: // SQUARE
+                        x = (i % map.size.x) * tile.x + (tile.x / 2);
+                        y = Math.floor(i / map.size.x) * tile.y + (tile.y / 2);
+                        shape = new P2.Box({ width: tile.x, height: tile.y, ...wallShapeCollision });
+                        break;
+                    default: // EMPTY
+                        return;
+                }
+                shape.material = wallMaterial;
+                let body = new P2.Body({ position: [x, y] });
+                body.addShape(shape);
+                this.world.addBody(body);
             });
             this.map = map;
         });
@@ -171,10 +184,26 @@ export default class Game{
                 (game.hook.hit && game.hook.hit.y) || game.hook.position.y
             );
         }
-        // Map & Player
+        // Draw physic bodies
         game.world.bodies.forEach(b => {
-            game.graphics.fillStyle(b.type === P2.Body.STATIC ? 0x7E7E7E : 0xFF0000);
-            game.graphics.fillCircle(b.position[0], b.position[1], (b.shapes[0] as P2.Circle).radius);
+            b.shapes.forEach(s => {
+                // Couleur en fonction du type
+                if(s.collisionGroup === COLLISIONS.WALL){
+                    game.graphics.fillStyle(0x7E7E7E);
+                }
+                else if(s.collisionGroup === COLLISIONS.PLAYER){
+                    game.graphics.fillStyle(0xFF0000);
+                }
+                // Dessin de la forme
+                if(b.shapes[0] instanceof P2.Circle){
+                    let circle = b.shapes[0] as P2.Circle;
+                    game.graphics.fillCircle(b.position[0], b.position[1], circle.radius);
+                }
+                else if(b.shapes[0] instanceof P2.Box){
+                    let box = b.shapes[0] as P2.Box;
+                    game.graphics.fillRect(b.position[0] - (box.width / 2), b.position[1] - (box.height / 2), box.width, box.height);
+                }
+            });
         });
     }
 }
