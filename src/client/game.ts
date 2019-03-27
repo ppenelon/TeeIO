@@ -138,7 +138,7 @@ export default class Game{
             // Si on a touché quelque chose
             if(game.hook.hit){
                 let direction = new Vector2(game.hook.hit.x, game.hook.hit.y).subtract(new Vector2(game.player.position[0], game.player.position[1])).normalize();
-                let force = 35;
+                let force = 28;
                 let move = direction.multiply(new Vector2(force, force));
                 game.player.applyImpulse([move.x, move.y]);
             }
