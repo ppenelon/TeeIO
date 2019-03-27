@@ -9,6 +9,13 @@ const COLLISIONS = {
     PLAYER: 1 << 1
 }
 
+const CONSTANTS = {
+    MOVE_SPEED_ACCELERATION: 250,
+    HOOK_FORCE: 35
+}
+
+type Key = Phaser.Input.Keyboard.Key;
+
 export default class Game{
 
     game: Phaser.Game;
@@ -21,7 +28,10 @@ export default class Game{
 
     hook: Hook;
 
+    keys: { left: Key, right: Key };
+
     constructor(){
+        // Game
         let that = this;
         this.game = new Phaser.Game({
             type: Phaser.AUTO,
@@ -40,14 +50,14 @@ export default class Game{
         let playerMaterial = new P2.Material();
         this.world.addContactMaterial(new P2.ContactMaterial(playerMaterial, wallMaterial, {
             restitution: 0.1,
-            friction: 0.8
+            friction: 0.7
         }));
         this.player = new P2.Body({ mass: 5, position: [155, 150], fixedRotation: true });
         let circleShape = new P2.Circle({ radius: 15, collisionGroup: COLLISIONS.PLAYER, collisionMask: COLLISIONS.WALL });
         circleShape.material = playerMaterial;
         this.player.addShape(circleShape);
         this.world.addBody(this.player);
-        // Map creation
+        // Map
         Map.fromWeb('map1')
         .then(map => {
             let tile = new Vector2(this.game.canvas.width / map.size.x, this.game.canvas.height / map.size.y);
@@ -76,7 +86,7 @@ export default class Game{
             });
             this.map = map;
         });
-        // Other
+        // Hook
         this.hook = new Hook(1750, 175);
     }
 
@@ -85,6 +95,10 @@ export default class Game{
     }
 
     private create(this: Phaser.Scene, game: Game){
+        game.keys = {
+            left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
+            right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+        }
         game.graphics = this.add.graphics();
         game.text = this.add.text(20, this.game.canvas.height - 35, 'Loading map...');
     }
@@ -96,10 +110,22 @@ export default class Game{
             game.text = null;
         }
         if(game.text) return;
+
         /**
          * LOGIC
          */
+        // Déplacements
+        if(game.keys.left.isDown && game.keys.right.isUp && game.player.velocity[0] > -50){
+            game.player.velocity[0] -= CONSTANTS.MOVE_SPEED_ACCELERATION * (delta / 1000);
+            game.player.velocity[0] = Math.max(game.player.velocity[0], -50);
+        }
+        if(game.keys.right.isDown && game.keys.left.isUp && game.player.velocity[0] < 50){
+            game.player.velocity[0] += CONSTANTS.MOVE_SPEED_ACCELERATION * (delta / 1000);
+            game.player.velocity[0] = Math.min(game.player.velocity[0], 50);
+        }
+        // Mouse manager
         let mouse = getMouseClicks(this.input.activePointer.buttons);
+        // Hook
         if(mouse.right.up){
             if(!game.hook.fired || (game.hook.fired && !game.hook.recalled && !game.hook.hit)){
                 // Si c'est un nouveau tir, on déclenche le grappin
@@ -152,7 +178,7 @@ export default class Game{
             // Si on a touché quelque chose
             if(game.hook.hit){
                 let direction = new Vector2(game.hook.hit.x, game.hook.hit.y).subtract(new Vector2(game.player.position[0], game.player.position[1])).normalize();
-                let force = 28;
+                let force = CONSTANTS.HOOK_FORCE;
                 let move = direction.multiply(new Vector2(force, force));
                 game.player.applyImpulse([move.x, move.y]);
             }
