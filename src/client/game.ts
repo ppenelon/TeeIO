@@ -54,7 +54,7 @@ export default class Game{
             restitution: 0.1,
             friction: 0.7
         }));
-        this.player = new P2.Body({ mass: 5, position: [155, 150], fixedRotation: true });
+        this.player = new P2.Body({ mass: 5, position: [100, 100], fixedRotation: true });
         let circleShape = new P2.Circle({ radius: 15, collisionGroup: COLLISIONS.PLAYER, collisionMask: COLLISIONS.WALL });
         circleShape.material = playerMaterial;
         this.player.addShape(circleShape);
