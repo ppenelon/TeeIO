@@ -12,8 +12,8 @@ const COLLISIONS = {
 const CONSTANTS = {
     MOVE_SPEED_ACCELERATION: 250,
     HOOK_FORCE: 35,
-    BOMB: [[0, 0], [1, 0], [0.9, 0.3], [0.8, 0.6], [0.6, 0.8], [0.3, 0.9], [0, 1]] as [number, number][],
-    CURVE: [[0, 0], [1, 0], [0.7, 0.1], [0.4, 0.2], [0.2, 0.4], [0.1, 0.7], [0, 1]] as [number, number][]
+    BOMB: [[0, 0], [1, 0], ...[1/4, 2/4, 3/4].map(factor => [Math.cos(factor * (Math.PI /2)), Math.sin(factor * (Math.PI /2))]) , [0, 1]] as [number, number][],
+    CURVE: [[0, 0], [1, 0], ...[3/4, 2/4, 1/4].map(factor => [1 + Math.cos(Math.PI + (factor * (Math.PI / 2))), 1 + Math.sin(Math.PI + (factor * (Math.PI / 2)))]), [0, 1]] as [number, number][]
 }
 
 type Key = Phaser.Input.Keyboard.Key;
@@ -267,7 +267,10 @@ export default class Game{
                 // On met à jour la couleur de la forme en fonction de son groupe
                 updateFillColor(s, game.graphics);
                 // Dessin de la forme
-                if(s instanceof P2.Box){
+                if(s instanceof P2.Circle){
+                    game.graphics.fillCircle(b.position[0], b.position[1], s.radius);
+                }
+                else if(s instanceof P2.Box){
                     game.graphics.fillRect(b.position[0] - (s.width / 2), b.position[1] - (s.height / 2), s.width, s.height);
                 }
                 else if(s instanceof P2.Convex){
