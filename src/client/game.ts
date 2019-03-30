@@ -56,8 +56,8 @@ export default class Game{
         let wallMaterial = new P2.Material();
         let playerMaterial = new P2.Material();
         this.world.addContactMaterial(new P2.ContactMaterial(playerMaterial, wallMaterial, {
-            restitution: 0.1,
-            friction: 0.7
+            restitution: 0.05,
+            friction: 0.75
         }));
         this.player = new P2.Body({ mass: 5, position: [100, 100], fixedRotation: true });
         let circleShape = new P2.Circle({ radius: 15, collisionGroup: COLLISIONS.PLAYER, collisionMask: COLLISIONS.WALL });
@@ -161,6 +161,10 @@ export default class Game{
         game.text = this.add.text(20, this.game.canvas.height - 35, 'Loading map...');
     }
 
+    tilemapLoadingState: number;
+    skinLoadingState: number;
+    loaderInitialized: boolean;
+    playerSprite: Phaser.GameObjects.Sprite;
     private update(this: Phaser.Scene, game: Game, time: number, delta: number){
         // Check if map loaded
         if(game.map && game.text){
@@ -168,6 +172,43 @@ export default class Game{
             game.text = null;
         }
         if(game.text) return;
+
+        // Loader
+        if(game.tilemapLoadingState === undefined) game.tilemapLoadingState = 0;
+        if(game.tilemapLoadingState === 0){
+            this.load.spritesheet('tilemap', '/assets/sprites/tilemap.png', { frameWidth: 50, frameHeight: 50 });
+            game.tilemapLoadingState = 1;
+        }
+
+        // Skin
+        if(game.skinLoadingState === undefined) game.skinLoadingState = 0;
+        if(game.skinLoadingState === 0){
+            this.load.image('skin', '/assets/sprites/skin.png');
+            game.skinLoadingState = 1;
+        }        
+
+        // Loader (Nécessaire pour le chargement dynamique des textures)
+        if(game.loaderInitialized === undefined) game.loaderInitialized = false;
+        if(!game.loaderInitialized){
+            this.load.addListener(Phaser.Loader.Events.FILE_COMPLETE, (key: string, type: string, ressource: Phaser.Textures.Texture) => {
+                if(key === 'tilemap'){ 
+                    for(let y = 0; y < game.map.size.y; y++){
+                        for(let x = 0; x < game.map.size.x; x++){
+                            let tile = game.map.getTile(x, y);
+                            if(tile === 0) continue;
+                            this.add.sprite((x * 50) + 25, (y * 50) + 25, 'tilemap', tile - 1);
+                        }
+                    }
+                    game.tilemapLoadingState = 2;
+                }
+                else if(key === 'skin'){
+                    game.playerSprite = this.add.sprite(game.player.position[0], game.player.position[1], 'skin');
+                    game.skinLoadingState = 2;
+                }
+            });
+            this.load.start();
+            game.loaderInitialized = true;
+        }
 
         /**
          * LOGIC
@@ -312,6 +353,11 @@ export default class Game{
                 }
             });
         });
+        // Skin update
+        if(game.skinLoadingState === 2){
+            game.playerSprite.x = game.player.position[0];
+            game.playerSprite.y = game.player.position[1];
+        }
     }
 }
 
