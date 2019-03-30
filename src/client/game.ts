@@ -13,7 +13,11 @@ const CONSTANTS = {
     MOVE_SPEED_ACCELERATION: 250,
     HOOK_FORCE: 35,
     BOMB: [[0, 0], [1, 0], ...[1/4, 2/4, 3/4].map(factor => [Math.cos(factor * (Math.PI /2)), Math.sin(factor * (Math.PI /2))]) , [0, 1]] as [number, number][],
-    CURVE: [[0, 0], [1, 0], ...[3/4, 2/4, 1/4].map(factor => [1 + Math.cos(Math.PI + (factor * (Math.PI / 2))), 1 + Math.sin(Math.PI + (factor * (Math.PI / 2)))]), [0, 1]] as [number, number][]
+    CURVE: [[0, 0], [1, 0], ...[3/4, 2/4, 1/4].map(factor => [1 + Math.cos(Math.PI + (factor * (Math.PI / 2))), 1 + Math.sin(Math.PI + (factor * (Math.PI / 2)))]), [0, 1]] as [number, number][],
+    JUMP_RANGE: {
+        from: Math.cos(Math.PI + (Math.PI / 4)),
+        to: Math.cos(Math.PI + ((Math.PI * 3) / 4))
+    }
 }
 
 type Key = Phaser.Input.Keyboard.Key;
@@ -27,10 +31,11 @@ export default class Game{
 
     world: P2.World;
     player: P2.Body;
+    canJump: boolean;
 
     hook: Hook;
 
-    keys: { left: Key, right: Key };
+    keys: { left: Key, right: Key, jump: Key };
 
     constructor(){
         // Game
@@ -138,6 +143,8 @@ export default class Game{
         });
         // Hook
         this.hook = new Hook(1750, 175);
+        // Other
+        this.canJump = false;
     }
 
     private preload(this: Phaser.Scene, game: Game){
@@ -147,7 +154,8 @@ export default class Game{
     private create(this: Phaser.Scene, game: Game){
         game.keys = {
             left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
-            right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+            right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+            jump: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
         }
         game.graphics = this.add.graphics();
         game.text = this.add.text(20, this.game.canvas.height - 35, 'Loading map...');
@@ -164,6 +172,24 @@ export default class Game{
         /**
          * LOGIC
          */
+        // Saut
+        game.canJump = false;
+        let playerRadius = (game.player.shapes[0] as P2.Circle).radius;
+        for(let contactEquation of game.world.narrowphase.contactEquations){
+            if(contactEquation.bodyA !== game.player && contactEquation.bodyB !== game.player) return;
+            let playerContactPoint = contactEquation.bodyA === game.player ? contactEquation.contactPointA : contactEquation.contactPointB;
+            if(
+                playerContactPoint[0] >= CONSTANTS.JUMP_RANGE.from * playerRadius &&
+                playerContactPoint[0] <= CONSTANTS.JUMP_RANGE.to * playerRadius &&
+                playerContactPoint[1] > 0){
+                    game.canJump = true;
+                    break;
+            }
+        }
+        if(game.keys.jump.isDown && game.canJump){
+            game.player.velocity[1] = -50;
+            game.canJump = false;
+        }
         // Déplacements
         if(game.keys.left.isDown && game.keys.right.isUp && game.player.velocity[0] > -50){
             game.player.velocity[0] -= CONSTANTS.MOVE_SPEED_ACCELERATION * (delta / 1000);
