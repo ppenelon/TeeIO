@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import * as path from 'path';
 
 import { SERVER_PORT, SERVER_HOST } from './config';
+import ServerGame from './Game';
 
 const app = express();
 const http = createServer(app);
@@ -16,8 +17,11 @@ app.get('/*', (req, res) => {
     res.sendFile(path.resolve('public/index.html'));
 });
 
+const game = new ServerGame(60);
+
 io.on('connection', (socket) => {
     console.log('User connected');
+    game.addPlayer(socket);
 });
 
 http.listen({
