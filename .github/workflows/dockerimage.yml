@@ -15,4 +15,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build the Docker image
-      run: ls -lR src && docker build . --tag tee-io:$(date +%s)
+      run: docker build . --tag tee-io:$(date +%s)
