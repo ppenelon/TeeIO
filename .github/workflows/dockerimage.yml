@@ -14,5 +14,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: docker build . --tag tee-io:$(date +%s)
+    - name: Publish to GitHub Packages
+      uses: elgohr/Publish-Docker-Github-Action@master
+      with:
+        name: ppenelon/TeeIO
+        username: ppenelon
+        password: ${{ secrets.GITHUB_TOKEN }}
