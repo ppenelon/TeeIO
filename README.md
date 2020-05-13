@@ -1,4 +1,6 @@
-## Procedures
+![Docker Image CI](https://github.com/ppenelon/TeeIO/workflows/Docker%20Image%20CI/badge.svg)
+
+## Get started
 * Build client with   
     `npm run build-client`
 * Build server with   
