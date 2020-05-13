@@ -1,9 +1,10 @@
-import * as gameloop from 'node-gameloop';
 import * as P2 from 'p2';
 import { Socket } from 'socket.io';
 
 import Game from '../shared/game/Game';
 import Player from '../shared/game/Player';
+
+const GameLoop = require('node-gameloop');
 
 export default class ServerGame{
 
@@ -14,11 +15,11 @@ export default class ServerGame{
 
     constructor(ticksPerSeconds: number){
         this.game = new Game(true);
-        this.gameloop = gameloop.setGameLoop(delta => this.update(delta), 1000 / ticksPerSeconds);
+        this.gameloop = GameLoop.setGameLoop((delta: number) => this.update(delta), 1000 / ticksPerSeconds);
         this.players = [];
     }
 
-    update(delta){
+    update(delta: number){
         this.game.updateWorld(delta);
     }
 
