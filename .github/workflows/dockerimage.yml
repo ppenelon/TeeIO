@@ -17,7 +17,7 @@ jobs:
     - name: Publish to GitHub Packages
       uses: elgohr/Publish-Docker-Github-Action@master
       with:
-        name: ppenelon/TeeIO
+        name: ppenelon/tee-io
         username: $GITHUB_ACTOR
         password: ${{ secrets.GITHUB_TOKEN }}
         registry: docker.pkg.github.com
