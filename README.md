@@ -12,10 +12,6 @@
 * Start server with   
     `npm start`
 
-## Phaser TypeScript
-Available here :   
-https://github.com/photonstorm/phaser3-docs/blob/master/typescript/phaser.d.ts   
-
 ## Environnement
 | Variable        | Type     | Default     | Description         |
 |-----------------|----------|-------------|---------------------|
